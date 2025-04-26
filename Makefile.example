@@ -1,0 +1,84 @@
+PROJECT_ID=<PROJECT_ID>
+EMAIL=<USER_OR_EMAIL_OF_THE_TEAM>
+
+REGION=us-east1
+REPOSITORY=ollama
+IMAGE_NAME=$(REPOSITORY)-llama3
+SERVICE_ACCOUNT=ollama@$(PROJECT_ID).iam.gserviceaccount.com
+MACHINE_TYPE=e2-highcpu-32
+
+ENDPOINT=YOUR_CLOUD_RUN_ENDPOINT
+
+# -------- AUTHENTICATION
+
+login:
+	gcloud auth login
+
+set-project:
+	gcloud config set project $(PROJECT_ID)
+
+# -------- CONFIGURING IAM & SA
+
+configure-iam-cloudbuild:
+	gcloud projects add-iam-policy-binding $(PROJECT_ID) \
+	  --member="user:$(EMAIL)" \
+	  --role="roles/cloudbuild.builds.editor"
+
+configure-iam-cloudrun:
+	gcloud iam service-accounts create ollama \
+	  --display-name="Service Account for Ollama Cloud Run"
+
+configure-iam-user-binding:
+	gcloud iam service-accounts add-iam-policy-binding ollama@$(PROJECT_ID).iam.gserviceaccount.com \
+	  --member="user:$(EMAIL)" \
+	  --role="roles/iam.serviceAccountUser"
+
+configure-iam: configure-iam-cloudbuild configure-iam-cloudrun configure-iam-user-binding
+
+# -------- SETUP
+
+## ENABLING APIS
+
+enable-apis:
+	gcloud services enable run.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com
+
+## CREATING REPOSITORY TO DEPLOY OUR DOCKERFILE IMAGE
+
+create-artifact-registry:
+	gcloud artifacts repositories create $(REPOSITORY) --repository-format=docker --location=$(REGION) || echo "Repositorio já existe"
+
+## CONFIGURING CLOUD BUILD
+
+build-image:
+	gcloud builds submit --tag $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPOSITORY)/$(IMAGE_NAME) --machine-type=$(MACHINE_TYPE)
+
+setup: login set-project configure-iam enable-apis create-artifact-registry build-image
+
+# -------- DEPLOY
+
+deploy-service:
+	sed -e "s/IMAGE_NAME/$(IMAGE_NAME)/g" \
+		-e "s/REGION/$(REGION)/g" \
+		-e "s/REPOSITORY/$(REPOSITORY)/g" \
+		-e "s/PROJECT_ID/$(PROJECT_ID)/g" \
+	deploy.yaml > deploy-final.yaml
+
+	gcloud run services replace deploy-final.yaml
+
+clean-files:
+	rm -f deploy-final.yaml
+
+deploy: set-project deploy-service clean-files
+
+# -------- TESTS
+
+test:
+	@echo "Testando o endpoint..."
+	curl -X POST $(ENDPOINT)/api/generate \
+		-H "Content-Type: application/json" \
+		-H "Authorization: Bearer $$(gcloud auth print-identity-token)" \
+		-d '{ \
+			"model": "llama3.2:1b", \
+			"prompt": "Explique brevemente a história do O Globo no Brasil.", \
+			"stream": false \
+		}'

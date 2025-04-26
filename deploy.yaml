@@ -1,0 +1,37 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: IMAGE_NAME
+  namespace: PROJECT_ID
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/maxScale: "5"
+        autoscaling.knative.dev/minScale: "0"
+        run.googleapis.com/concurrency: "8"
+    spec:
+      containerConcurrency: 8
+      containers:
+        - image: REGION-docker.pkg.dev/PROJECT_ID/REPOSITORY/IMAGE_NAME
+          ports:
+            - containerPort: 8888
+          env:
+            - name: OLLAMA_HOST
+              value: 0.0.0.0:8888
+            - name: OLLAMA_MODELS
+              value: /models
+            - name: OLLAMA_DEBUG
+              value: "false"
+            - name: OLLAMA_KEEP_ALIVE
+              value: "-1"
+            - name: OLLAMA_NUM_PARALLEL
+              value: "6"
+          resources:
+            limits:
+              cpu: "8"
+              memory: "32Gi"
+      serviceAccountName: REPOSITORY@PROJECT_ID.iam.gserviceaccount.com
+  traffic:
+    - latestRevision: true
+      percent: 100
