@@ -72,7 +72,7 @@ This project provisions a **fully private Ollama-based LLM inference server** (u
 - IAM roles strictly enforced for service accounts.
 
 ## Roadmap
-1. Add automatic scaling configuration
+1. Add Preemptible for FinOps and cpuIdle=true
 
 2. Add optional HTTPS custom domain
 
