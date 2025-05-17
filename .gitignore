@@ -1,2 +1,8 @@
-Makefile
-deploy-final.yaml
+__pycache__
+
+venv
+
+.env
+
+infra/Makefile
+infra/deploy-final.yaml

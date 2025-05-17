@@ -1,13 +1,13 @@
 PROJECT_ID=<PROJECT_ID>
 EMAIL=<USER_OR_EMAIL_OF_THE_TEAM>
 
-REGION=us-east1
+REGION=us-east1 # ou us-central1
 REPOSITORY=ollama
 IMAGE_NAME=$(REPOSITORY)-llama3
 SERVICE_ACCOUNT=ollama@$(PROJECT_ID).iam.gserviceaccount.com
-MACHINE_TYPE=e2-highcpu-32
+MACHINE_TYPE=e2-highcpu-32 # para GCE
 
-ENDPOINT=YOUR_CLOUD_RUN_ENDPOINT
+ENDPOINT=<CLOUD_RUN_ENDPOINT>
 
 # -------- AUTHENTICATION
 
@@ -16,6 +16,7 @@ login:
 
 set-project:
 	gcloud config set project $(PROJECT_ID)
+	gcloud config set run/region $(REGION)
 
 # -------- CONFIGURING IAM & SA
 
@@ -24,9 +25,18 @@ configure-iam-cloudbuild:
 	  --member="user:$(EMAIL)" \
 	  --role="roles/cloudbuild.builds.editor"
 
+	gcloud projects get-iam-policy $(PROJECT_ID) \
+	  --flatten="bindings[].members" \
+	  --filter="bindings.members:user:$(EMAIL)" \
+	  --format="table(bindings.role)"
+
+	gcloud projects add-iam-policy-binding $(PROJECT_ID) \
+	  --member="user:$(EMAIL)" \
+	  --role="roles/cloudbuild.builds.editor"
+
 configure-iam-cloudrun:
 	gcloud iam service-accounts create ollama \
-	  --display-name="Service Account for Ollama Cloud Run"
+	  --display-name="Service Account for Ollama Cloud Run" || true
 
 configure-iam-user-binding:
 	gcloud iam service-accounts add-iam-policy-binding ollama@$(PROJECT_ID).iam.gserviceaccount.com \
@@ -68,7 +78,11 @@ deploy-service:
 clean-files:
 	rm -f deploy-final.yaml
 
-deploy: set-project deploy-service clean-files
+deploy: set-project deploy-service clean-files get-token
+
+get-token:
+	@echo "Adicione o token na env OLLAMA_CLIENT_TOKEN"
+	gcloud auth print-identity-token
 
 # -------- TESTS
 
@@ -80,5 +94,5 @@ test:
 		-d '{ \
 			"model": "llama3.2:1b", \
 			"prompt": "Explique brevemente a história do O Globo no Brasil.", \
-			"stream": false \
+			"stream": true \
 		}'

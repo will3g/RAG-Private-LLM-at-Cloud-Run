@@ -29,8 +29,8 @@ spec:
               value: "6"
           resources:
             limits:
-              cpu: "8"
-              memory: "32Gi"
+              cpu: "2"
+              memory: "4Gi"
       serviceAccountName: REPOSITORY@PROJECT_ID.iam.gserviceaccount.com
   traffic:
     - latestRevision: true
