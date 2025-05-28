@@ -13,6 +13,6 @@ ENV OLLAMA_KEEP_ALIVE -1
 
 # https://ollama.com
 ENV MODEL llama3.2:1b
-RUN ollama serve & sleep 5 && ollama pull $MODEL 
+RUN ollama serve & sleep 5 && ollama pull $MODEL
 
 ENTRYPOINT ["ollama", "serve"]

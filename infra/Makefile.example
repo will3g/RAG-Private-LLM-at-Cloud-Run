@@ -1,13 +1,12 @@
 PROJECT_ID=<PROJECT_ID>
-EMAIL=<USER_OR_EMAIL_OF_THE_TEAM>
+EMAIL=<EMAIL>
 
-REGION=us-east1 # ou us-central1
+REGION=us-east1
 REPOSITORY=ollama
 IMAGE_NAME=$(REPOSITORY)-llama3
 SERVICE_ACCOUNT=ollama@$(PROJECT_ID).iam.gserviceaccount.com
-MACHINE_TYPE=e2-highcpu-32 # para GCE
 
-ENDPOINT=<CLOUD_RUN_ENDPOINT>
+ENDPOINT=https://<ENDPOINT>
 
 # -------- AUTHENTICATION
 
@@ -17,6 +16,8 @@ login:
 set-project:
 	gcloud config set project $(PROJECT_ID)
 	gcloud config set run/region $(REGION)
+
+auth: login set-project
 
 # -------- CONFIGURING IAM & SA
 
@@ -36,14 +37,14 @@ configure-iam-cloudbuild:
 
 configure-iam-cloudrun:
 	gcloud iam service-accounts create ollama \
-	  --display-name="Service Account for Ollama Cloud Run" || true
+	  --display-name="Service Account for Ollama Cloud Run"
 
 configure-iam-user-binding:
 	gcloud iam service-accounts add-iam-policy-binding ollama@$(PROJECT_ID).iam.gserviceaccount.com \
 	  --member="user:$(EMAIL)" \
 	  --role="roles/iam.serviceAccountUser"
 
-configure-iam: configure-iam-cloudbuild configure-iam-cloudrun configure-iam-user-binding
+configure-iam: set-project configure-iam-cloudbuild configure-iam-cloudrun configure-iam-user-binding
 
 # -------- SETUP
 
@@ -60,9 +61,9 @@ create-artifact-registry:
 ## CONFIGURING CLOUD BUILD
 
 build-image:
-	gcloud builds submit --tag $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPOSITORY)/$(IMAGE_NAME) --machine-type=$(MACHINE_TYPE)
+	gcloud builds submit --tag $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPOSITORY)/$(IMAGE_NAME)
 
-setup: login set-project configure-iam enable-apis create-artifact-registry build-image
+setup: set-project configure-iam enable-apis create-artifact-registry build-image
 
 # -------- DEPLOY
 
