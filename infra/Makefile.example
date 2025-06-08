@@ -11,9 +11,11 @@ ENDPOINT=https://<ENDPOINT>
 # -------- AUTHENTICATION
 
 login:
+	@echo "\n > AUTH: Realizando login no cloud console\n"
 	gcloud auth login
 
 set-project:
+	@echo "\n > AUTH: Setando projeto e região padrão no gcloud\n"
 	gcloud config set project $(PROJECT_ID)
 	gcloud config set run/region $(REGION)
 
@@ -21,74 +23,83 @@ auth: login set-project
 
 # -------- CONFIGURING IAM & SA
 
-configure-iam-cloudbuild:
-	gcloud projects add-iam-policy-binding $(PROJECT_ID) \
-	  --member="user:$(EMAIL)" \
-	  --role="roles/cloudbuild.builds.editor"
-
-	gcloud projects get-iam-policy $(PROJECT_ID) \
-	  --flatten="bindings[].members" \
-	  --filter="bindings.members:user:$(EMAIL)" \
-	  --format="table(bindings.role)"
-
-	gcloud projects add-iam-policy-binding $(PROJECT_ID) \
-	  --member="user:$(EMAIL)" \
-	  --role="roles/cloudbuild.builds.editor"
-
-configure-iam-cloudrun:
+configure-iam-service-account:
+	@echo "\n > IAM - SA: Criando conta de serviço \n"
 	gcloud iam service-accounts create ollama \
-	  --display-name="Service Account for Ollama Cloud Run"
+	  --project=$(PROJECT_ID) \
+	  --display-name="Conta de serviço para Cloud Run, Artifact Registry e Cloud Build" || echo "Conta de serviço já existe"
+
+configure-iam-cloudbuild:
+	@echo "\n > IAM - Policy: Adicionando politica de permissão de edição para o Cloud Build \n"
+	gcloud projects add-iam-policy-binding $(PROJECT_ID) \
+	  --member="serviceAccount:$(SERVICE_ACCOUNT)" \
+	  --role="roles/cloudbuild.builds.editor"
 
 configure-iam-user-binding:
-	gcloud iam service-accounts add-iam-policy-binding ollama@$(PROJECT_ID).iam.gserviceaccount.com \
-	  --member="user:$(EMAIL)" \
+	@echo "\n > IAM - SA: Vinculando conta de serviço com nosso email/user \n"
+	gcloud iam service-accounts add-iam-policy-binding $(SERVICE_ACCOUNT) \
+	  --member="serviceAccount:$(SERVICE_ACCOUNT)" \
 	  --role="roles/iam.serviceAccountUser"
 
-configure-iam: set-project configure-iam-cloudbuild configure-iam-cloudrun configure-iam-user-binding
+iam-show-permissions:
+	@echo "\n > IAM - Policy: Confirmando permissões vinculadas ao email/user \n"
+	gcloud projects get-iam-policy $(PROJECT_ID) \
+	  --flatten="bindings[].members" \
+	  --filter="bindings.members:serviceAccount:$(SERVICE_ACCOUNT)" \
+	  --format="table(bindings.role)"
+
+configure-iam: set-project configure-iam-service-account configure-iam-cloudbuild configure-iam-user-binding iam-show-permissions
 
 # -------- SETUP
 
 ## ENABLING APIS
 
 enable-apis:
+	@echo "\n > ARTIFACT REGISTRY: Ativando serviço \n"
 	gcloud services enable run.googleapis.com artifactregistry.googleapis.com cloudbuild.googleapis.com
 
 ## CREATING REPOSITORY TO DEPLOY OUR DOCKERFILE IMAGE
 
 create-artifact-registry:
+	@echo "\n > ARTIFACT REGISTRY: Criando repositório \n"
 	gcloud artifacts repositories create $(REPOSITORY) --repository-format=docker --location=$(REGION) || echo "Repositorio já existe"
 
 ## CONFIGURING CLOUD BUILD
 
 build-image:
-	gcloud builds submit --tag $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPOSITORY)/$(IMAGE_NAME)
+	@echo "\n > CLOUD BUILD: Criando/Versionando a imagem do deploy & adicionando no Artifact Registry \n"
+	sleep 10
+	gcloud builds submit --project=$(PROJECT_ID) --tag $(REGION)-docker.pkg.dev/$(PROJECT_ID)/$(REPOSITORY)/$(IMAGE_NAME)
 
 setup: set-project configure-iam enable-apis create-artifact-registry build-image
 
 # -------- DEPLOY
 
 deploy-service:
+	@echo "\n > CLOUD RUN - DEPLOY: Preparando arquivo de deploy \n"
 	sed -e "s/IMAGE_NAME/$(IMAGE_NAME)/g" \
 		-e "s/REGION/$(REGION)/g" \
 		-e "s/REPOSITORY/$(REPOSITORY)/g" \
 		-e "s/PROJECT_ID/$(PROJECT_ID)/g" \
 	deploy.yaml > deploy-final.yaml
 
+	@echo "\n > CLOUD RUN - DEPLOY: Realizando deploy \n"
 	gcloud run services replace deploy-final.yaml
 
 clean-files:
+	@echo "\n > CLOUD RUN - DEPLOY: Removendo arquivos desnecessários do ambiente local \n"
 	rm -f deploy-final.yaml
 
 deploy: set-project deploy-service clean-files get-token
 
 get-token:
-	@echo "Adicione o token na env OLLAMA_CLIENT_TOKEN"
+	@echo "\n > GET-TOKEN: Adicione o token na env OLLAMA_CLIENT_TOKEN \n"
 	gcloud auth print-identity-token
 
 # -------- TESTS
 
 test:
-	@echo "Testando o endpoint..."
+	@echo "\n > TEST: Testando a LLM no Cloud Run \n"
 	curl -X POST $(ENDPOINT)/api/generate \
 		-H "Content-Type: application/json" \
 		-H "Authorization: Bearer $$(gcloud auth print-identity-token)" \
