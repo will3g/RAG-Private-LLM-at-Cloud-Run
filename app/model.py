@@ -1,3 +1,8 @@
+import sys
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from llm.rag_query import retrieve_chunks, build_prompt
 from llm.ollama_client import query_ollama
 
