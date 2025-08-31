@@ -8,6 +8,10 @@ SERVICE_ACCOUNT=ollama@$(PROJECT_ID).iam.gserviceaccount.com
 
 ENDPOINT=https://<ENDPOINT>
 
+# --------
+
+all: auth setup deploy
+
 # -------- AUTHENTICATION
 
 login:
