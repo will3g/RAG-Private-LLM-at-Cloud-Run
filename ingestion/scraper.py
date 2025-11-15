@@ -83,7 +83,7 @@ def get_articles_from_sitemap() -> List[Dict]:
                 **article,
                 "content": content
             })
-        if len(articles_with_content) == 3: break # REMOVER CASO QUEIRA INSERIR MAIS DADOS: FIM DE DEMONSTRAÇÃO
+        if len(articles_with_content) == 10: break # REMOVER CASO QUEIRA INSERIR MAIS DADOS: FIM DE DEMONSTRAÇÃO
 
     print(f"{len(articles_with_content)} matérias com conteúdo extraído.")
     return articles_with_content

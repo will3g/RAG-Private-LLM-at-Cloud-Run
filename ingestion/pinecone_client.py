@@ -9,7 +9,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-PINECONE_CLOUD = os.getenv("PINECONE_CLOUD", 'gcp')
+PINECONE_CLOUD = os.getenv("PINECONE_CLOUD", 'aws')
 PINECONE_ENV = os.getenv("PINECONE_ENVIRONMENT")
 INDEX_NAME = os.getenv("INDEX_NAME", "oglobo-news")
 NAMESPACE = os.getenv("PINECONE_NAMESPACE", "default")
@@ -50,7 +50,7 @@ def vector_creator(chunks: List[Dict]) -> List[Dict]:
                 "content": chunk["content"],
                 "date": chunk["date"],
                 "position": chunk.get("position", 0),
-                "image_url": chunk.get("image_url", "")
+                "image_url": chunk['image_url'] if chunk['image_url'] else ''
             }
         })
     return _vectors
